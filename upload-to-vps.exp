@@ -1,0 +1,187 @@
+#!/usr/bin/expect -f
+# upload-to-vps.exp
+# Automated upload script for OpenClaw deployment (native, no Docker)
+#
+# Usage: ./upload-to-vps.exp <command>
+#   test           - Test SSH connection
+#   upload         - Upload deployment files
+#   upload-source  - Upload openclaw-source directory
+#   install        - Run install script on VPS
+#   run <cmd>      - Run a command on VPS
+#   ssh            - Interactive SSH session
+
+set timeout 60
+
+# ===== FILL IN YOUR CREDENTIALS =====
+set ssh_key "~/.ssh/vps_openclaw"
+set host "YOUR_VPS_IP"
+set port "22"
+set user "YOUR_USERNAME"
+set key_pass "YOUR_SSH_KEY_PASSPHRASE"
+set user_pass "YOUR_USER_PASSWORD"
+# =====================================
+
+proc do_auth {} {
+    global key_pass user_pass
+    
+    expect {
+        "Enter passphrase for key*" {
+            send "$key_pass\r"
+            exp_continue
+        }
+        "password:" {
+            send "$user_pass\r"
+            exp_continue
+        }
+        "Permission denied*" {
+            puts "ERROR: Authentication failed"
+            exit 1
+        }
+        -re "\\$|#" {
+            return 1
+        }
+        timeout {
+            puts "ERROR: Connection timeout"
+            exit 1
+        }
+    }
+}
+
+proc do_auth_scp {} {
+    global key_pass user_pass
+    
+    expect {
+        "Enter passphrase for key*" {
+            send "$key_pass\r"
+            exp_continue
+        }
+        "password:" {
+            send "$user_pass\r"
+            exp_continue
+        }
+        "Permission denied*" {
+            puts "ERROR: Authentication failed"
+            exit 1
+        }
+        "100%" {
+            return 1
+        }
+        eof {
+            return 1
+        }
+        timeout {
+            puts "ERROR: Transfer timeout"
+            exit 1
+        }
+    }
+}
+
+set command [lindex $argv 0]
+
+switch $command {
+    "test" {
+        puts "Testing SSH connection to VPS..."
+        spawn ssh -p $port -i $ssh_key $user@$host "echo 'SSH OK' && hostname && node -v 2>/dev/null || echo 'Node not installed' && pnpm -v 2>/dev/null || echo 'pnpm not installed'"
+        do_auth_scp
+        puts "\nConnection test complete!"
+    }
+    
+    "upload" {
+        puts "Uploading deployment files to VPS..."
+        set base_dir [file dirname [info script]]
+        
+        # Create staging directory
+        puts "\nStep 1/3: Creating directories..."
+        spawn ssh -p $port -i $ssh_key $user@$host "mkdir -p ~/openclaw-deploy"
+        do_auth_scp
+        
+        # Upload scripts
+        puts "\nStep 2/3: Uploading scripts..."
+        spawn scp -P $port -i $ssh_key \
+            $base_dir/vps-setup-native.sh \
+            $base_dir/install-openclaw.sh \
+            $base_dir/update-openclaw.sh \
+            $base_dir/startup-cleanup.sh \
+            $base_dir/setup-duckdns.sh \
+            $base_dir/setup-ssl.sh \
+            $base_dir/setup-webhook.sh \
+            $user@$host:~/openclaw-deploy/
+        do_auth_scp
+        
+        # Upload config files
+        puts "\nStep 3/3: Uploading config files..."
+        spawn scp -P $port -i $ssh_key \
+            $base_dir/config.json5 \
+            $base_dir/nginx-openclaw.conf \
+            $base_dir/openclaw.service \
+            $base_dir/.env.template \
+            $user@$host:~/openclaw-deploy/
+        do_auth_scp
+        
+        # Upload .env.openclaw if it exists
+        if {[file exists "$base_dir/.env.openclaw"]} {
+            spawn scp -P $port -i $ssh_key $base_dir/.env.openclaw $user@$host:~/openclaw-deploy/
+            do_auth_scp
+        }
+        
+        puts "\n========================================="
+        puts "Upload complete!"
+        puts "========================================="
+        puts "Files uploaded to ~/openclaw-deploy/"
+        puts ""
+        puts "Next steps on VPS:"
+        puts "  1. sudo bash ~/openclaw-deploy/vps-setup-native.sh"
+        puts "  2. Upload openclaw-source to /opt/openclaw/"
+        puts "  3. bash ~/openclaw-deploy/install-openclaw.sh"
+    }
+    
+    "upload-source" {
+        puts "Uploading openclaw-source directory (this may take a while)..."
+        set base_dir [file dirname [info script]]
+        set source_dir "$base_dir/../openclaw-source"
+        
+        # Create target directory
+        spawn ssh -p $port -i $ssh_key $user@$host "sudo mkdir -p /opt/openclaw && sudo chown $user:$user /opt/openclaw"
+        do_auth_scp
+        
+        spawn scp -r -P $port -i $ssh_key $source_dir/* $user@$host:/opt/openclaw/
+        set timeout 600
+        do_auth_scp
+        
+        puts "\nSource upload complete!"
+    }
+    
+    "install" {
+        puts "Running install script on VPS..."
+        spawn ssh -p $port -i $ssh_key $user@$host "bash ~/openclaw-deploy/install-openclaw.sh"
+        do_auth
+        interact
+    }
+    
+    "run" {
+        set cmd [join [lrange $argv 1 end] " "]
+        puts "Running: $cmd"
+        spawn ssh -p $port -i $ssh_key $user@$host $cmd
+        do_auth_scp
+    }
+    
+    "ssh" {
+        puts "Starting interactive SSH session..."
+        spawn ssh -p $port -i $ssh_key $user@$host
+        do_auth
+        interact
+    }
+    
+    default {
+        puts "Usage: ./upload-to-vps.exp <command>"
+        puts ""
+        puts "Commands:"
+        puts "  test           - Test SSH connection"
+        puts "  upload         - Upload deployment files"
+        puts "  upload-source  - Upload openclaw-source directory"
+        puts "  install        - Run install script on VPS"
+        puts "  run <cmd>      - Run a command on VPS"
+        puts "  ssh            - Interactive SSH session"
+        exit 1
+    }
+}

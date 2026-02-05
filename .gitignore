@@ -1,0 +1,26 @@
+# OpenClaw Deployment - Git Ignore
+# ================================
+# Credentials en secrets NOOIT committen!
+
+# Environment files met secrets
+.env.openclaw
+.env.local
+.env.production
+*.env
+!.env.template
+
+# Credentials files
+VPS_CREDENTIALS.md
+CREDENTIALS_MASTER.md
+
+# SSH keys
+*_private_key
+*.pem
+id_*
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db

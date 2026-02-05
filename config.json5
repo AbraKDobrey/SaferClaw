@@ -1,0 +1,329 @@
+// /home/openclaw/.openclaw/config.json5
+// OpenClaw Autonomous Bot Configuration
+// ====================================
+// 
+// INSTRUCTIES:
+// 1. Kopieer dit bestand naar ~/.openclaw/config.json5
+// 2. Vervang YOUR_TELEGRAM_USER_ID met je echte Telegram user ID
+// 3. Vervang YOUR_DOMAIN met je domein (bijv: myopenclaw.duckdns.org)
+// 4. Controleer of alle tokens in .env.openclaw staan
+//
+{
+  // ===== META =====
+  meta: {
+    lastTouchedVersion: "current",
+    lastTouchedAt: "2026-02-05",
+    profile: "autonomous-vps"
+  },
+
+  // ===== LOGGING =====
+  logging: {
+    level: "info",
+    consoleLevel: "info",
+    redactSensitive: "tools",
+    file: "/var/log/openclaw/openclaw.log"
+  },
+
+  // ===== SESSION ISOLATION =====
+  session: {
+    dmScope: "per-channel-peer"
+  },
+
+  // ===== DISCOVERY - UIT =====
+  discovery: {
+    mdns: {
+      mode: "off"  // KRITIEK: geen LAN discovery
+    }
+  },
+
+  // ===== DIAGNOSTICS - UIT =====
+  diagnostics: {
+    otel: {
+      enabled: false
+    }
+  },
+
+  // ===== GATEWAY =====
+  gateway: {
+    port: 47832,
+    bind: "loopback",
+    
+    auth: {
+      mode: "token"
+      // Token via env: OPENCLAW_GATEWAY_TOKEN
+    },
+    
+    controlUi: {
+      enabled: false
+    },
+    
+    trustedProxies: ["127.0.0.1"],
+    
+    http: {
+      endpoints: {
+        chatCompletions: { enabled: false },
+        responses: { enabled: false }
+      }
+    },
+    
+    nodes: {
+      denyCommands: ["*"]
+    },
+    
+    tailscale: { mode: "off" },
+    reload: { mode: "off" }
+  },
+
+  // ===== TOOLS - AUTONOOM =====
+  tools: {
+    profile: "full",
+    
+    deny: [
+      "gateway",
+      "nodes"
+    ],
+    
+    elevated: {
+      enabled: false
+    },
+    
+    exec: {
+      host: "sandbox",
+      security: "full",
+      ask: "off",
+      timeoutSec: 600,
+      backgroundMs: 30000,
+      cleanupMs: 300000,
+      notifyOnExit: true,
+      ptyDefault: true,
+      applyPatch: {
+        enabled: true
+      }
+    },
+    
+    sandbox: {
+      tools: {
+        deny: ["gateway", "nodes"]
+      }
+    },
+    
+    subagents: {
+      tools: {
+        deny: ["gateway", "nodes"]
+      }
+    },
+    
+    message: {
+      allowCrossContextSend: true,
+      crossContext: {
+        allowWithinProvider: true,
+        allowAcrossProviders: false
+      },
+      broadcast: {
+        enabled: true
+      }
+    },
+    
+    agentToAgent: {
+      enabled: true
+    },
+    
+    web: {
+      search: {
+        enabled: true,
+        maxResults: 20,
+        timeoutSeconds: 30
+      },
+      fetch: {
+        enabled: true,
+        maxChars: 100000,
+        timeoutSeconds: 60,
+        maxRedirects: 5
+      }
+    }
+  },
+
+  // ===== AGENTS - SANDBOX MET NETWERK =====
+  agents: {
+    defaults: {
+      // Default model - via OpenRouter
+      model: { primary: "openrouter/x-ai/grok-4.1-fast" },
+      
+      sandbox: {
+        mode: "all",
+        scope: "agent",  // PERSISTENT workspace
+        workspaceAccess: "rw",
+        workspaceRoot: "/workspace",
+        
+        docker: {
+          image: "openclaw-sandbox:full",
+          containerPrefix: "oclaw-",
+          workdir: "/workspace",
+          readOnlyRoot: false,
+          network: "bridge",  // NETWERK AAN
+          capDrop: ["SYS_ADMIN", "NET_ADMIN", "SYS_PTRACE"],
+          tmpfs: ["/tmp", "/var/tmp"],
+          memory: "4g",
+          cpus: 2.0,
+          pidsLimit: 500,
+          env: {
+            LANG: "C.UTF-8",
+            HOME: "/home/claw",
+            PATH: "/home/claw/.local/bin:/usr/local/bin:/usr/bin:/bin",
+            CURSOR_API_KEY: "${CURSOR_API_KEY}"
+          }
+        },
+        
+        browser: {
+          enabled: false
+        },
+        
+        prune: {
+          idleHours: 12,
+          maxAgeDays: 3
+        }
+      },
+      
+      elevatedDefault: "off",
+      timeoutSeconds: 1800,
+      maxConcurrent: 3,
+      contextTokens: 150000,
+      
+      subagents: {
+        maxConcurrent: 5,
+        archiveAfterMinutes: 120
+      },
+      
+      memory: {
+        enabled: true,
+        provider: "local",
+        sources: ["memory"],
+        sync: {
+          intervalMinutes: 5,
+          onBoot: true
+        },
+        remote: {
+          batch: { enabled: false }
+        }
+      }
+    }
+  },
+
+  // ===== TELEGRAM CHANNEL =====
+  channels: {
+    telegram: {
+      enabled: true,
+      // botToken via env: TELEGRAM_BOT_TOKEN
+      
+      dmPolicy: "allowlist",
+      allowFrom: [
+        // VERVANG MET JE TELEGRAM USER ID
+        // Vind dit met @userinfobot in Telegram
+        YOUR_TELEGRAM_USER_ID
+      ],
+      
+      groupPolicy: "disabled",
+      configWrites: true,
+      streamMode: "partial",
+      
+      actions: {
+        reactions: true,
+        sendMessage: true,
+        deleteMessage: true,
+        sticker: false
+      },
+      
+      reactionLevel: "ack",
+      historyLimit: 100,
+      dmHistoryLimit: 200,
+      textChunkLimit: 4000
+      
+      // Webhook configuratie - VERVANG YOUR_DOMAIN
+      webhookUrl: "https://YOUR_DOMAIN/tg/webhook",
+      webhookPath: "/tg/webhook"
+      // webhookSecret wordt via env var TELEGRAM_WEBHOOK_SECRET gezet
+    },
+    
+    defaults: {
+      groupPolicy: "disabled"
+    }
+  },
+
+  // ===== SKILLS =====
+  skills: {
+    allowBundled: [
+      "cursor-cli",      // PRIMARY coding tool - Cursor CLI agents
+      "coding-agent",    // Fallback: Codex/Claude Code/Pi
+      "tmux",
+      "summarize",
+      "github",
+      "weather",
+      "session-logs",
+      "openai-whisper",
+      "openai-whisper-api",
+      "canvas",
+      "oracle",
+      "healthcheck",
+      "himalaya"
+    ],
+    
+    load: {
+      watch: false,
+      extraDirs: []
+    },
+    
+    entries: {
+      "skill-creator": { enabled: false },
+      "clawhub": { enabled: false },
+      "mcporter": { enabled: false },
+      "camsnap": { enabled: false }
+    }
+  },
+
+  // ===== HOOKS =====
+  hooks: {
+    enabled: true,
+    path: "/hooks",
+    maxBodyBytes: 2097152
+  },
+
+  // ===== CRON =====
+  cron: {
+    enabled: true,
+    jobs: [
+      {
+        id: "daily-briefing",
+        name: "Daily Briefing",
+        enabled: true,
+        schedule: { cron: "0 8 * * *" },
+        sessionTarget: "main",
+        wakeMode: "now",
+        payload: {
+          kind: "agentTurn",
+          message: "Goedemorgen! Wat staat er vandaag op de planning?",
+          deliver: true,
+          channel: "telegram",
+          // VERVANG MET JE TELEGRAM USER ID
+          to: "YOUR_TELEGRAM_USER_ID"
+        }
+      }
+    ]
+  },
+
+  // ===== APPROVALS - UIT =====
+  approvals: {
+    exec: {
+      enabled: false
+    }
+  },
+
+  // ===== BROWSER - UIT =====
+  browser: {
+    enabled: false
+  },
+
+  // ===== PLUGINS - UIT =====
+  plugins: {
+    enabled: false
+  }
+}

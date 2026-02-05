@@ -1,0 +1,66 @@
+# /etc/systemd/system/openclaw.service
+# OpenClaw Systemd Service (Native - No Docker)
+# ==============================================
+#
+# BEFORE USING: Replace YOUR_USER with your actual VPS username.
+#
+# Installation:
+#   sudo cp openclaw.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable openclaw
+#   sudo systemctl start openclaw
+#
+# Commands:
+#   systemctl status openclaw     # Check status
+#   sudo systemctl restart openclaw  # Restart
+#   journalctl -u openclaw -f     # View logs
+#
+
+[Unit]
+Description=OpenClaw AI Assistant Gateway
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=YOUR_USER
+Group=YOUR_USER
+WorkingDirectory=/opt/openclaw
+
+# Environment
+EnvironmentFile=/opt/openclaw/.env.openclaw
+Environment=NODE_ENV=production
+Environment=OPENCLAW_PREFER_PNPM=1
+Environment=OPENCLAW_DISABLE_BONJOUR=1
+Environment=PATH=/home/YOUR_USER/.bun/bin:/usr/local/bin:/usr/bin:/bin
+
+# Pre-start cleanup
+ExecStartPre=/opt/openclaw/startup-cleanup.sh
+
+# Main process - run OpenClaw gateway directly with Node
+ExecStart=/usr/bin/node /opt/openclaw/dist/index.js gateway --allow-unconfigured
+
+# Graceful stop
+ExecStop=/bin/kill -SIGTERM $MAINPID
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=200
+StartLimitBurst=5
+
+# Timeouts
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+# Security hardening
+PrivateTmp=true
+ProtectHome=read-only
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=openclaw
+
+[Install]
+WantedBy=multi-user.target
