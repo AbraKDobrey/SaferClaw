@@ -40,7 +40,7 @@ SaferClaw takes the powerful OpenClaw platform and wraps it in a locked-down, pr
 - **Tool use**: Shell execution, file editing, web search, web fetch, git operations
 - **Skills framework**: 50+ plugins for coding, summarization, email, and more
 - **Memory**: Persistent conversation storage and retrieval
-- **Sandboxed execution**: Docker-based isolation for code the AI writes
+- **Sandboxed execution**: Configurable isolation for code the AI writes
 - **Cron jobs**: Scheduled autonomous tasks (daily briefings, health checks)
 - **Sub-agents**: Spawn child agents for parallel work
 
@@ -56,7 +56,7 @@ OpenClaw out of the box ships with **permissive defaults** designed for local de
 |------|-------------------|-----------|
 | **Elevated mode** | Available (`full` bypasses ALL security) | **Disabled entirely** |
 | **Auto-allow skills** | Skills can auto-approve their own binaries | **Disabled** -- every binary needs explicit approval |
-| **Sandbox** | Optional, often `off` | **Mandatory** (`mode: "all"`) -- all code runs in Docker |
+| **Sandbox** | Optional, often `off` | **Mandatory** (`mode: "all"`) -- all exec is sandboxed |
 | **Gateway binding** | `0.0.0.0` (open to internet) | **`loopback`** (localhost only, behind Nginx) |
 | **Gateway auth** | Optional | **Token-based** (random 64-char hex) |
 | **Control UI** | Enabled (web dashboard) | **Disabled** (attack surface reduction) |
@@ -69,20 +69,19 @@ OpenClaw out of the box ships with **permissive defaults** designed for local de
 | **Dangerous skills** | `skill-creator`, `clawhub`, `mcporter` enabled | **Disabled** |
 | **Tool deny list** | Empty | **`gateway`, `nodes`** denied |
 | **DM scope** | `main` (shared context = cross-user leakage) | **`per-channel-peer`** (isolated) |
-| **Workspace access** | `rw` on host filesystem | **`rw` inside Docker sandbox only** |
+| **Workspace access** | `rw` on host filesystem | **`rw` scoped to `/workspace` only** |
 | **Sensitive data in logs** | Full content | **Redacted** (`redactSensitive: "tools"`) |
 | **Browser automation** | Enabled (Puppeteer) | **Disabled** |
 | **Plugins** | Enabled | **Disabled** |
 | **Systemd hardening** | None | **`PrivateTmp`, `ProtectHome`, `NoNewPrivileges`** |
-| **Docker caps** | Default (all) | **Dropped** `SYS_ADMIN`, `NET_ADMIN`, `SYS_PTRACE` |
-| **Container resources** | Unlimited | **4GB RAM, 2 CPUs, 500 PIDs max** |
-| **Container pruning** | Manual | **Automatic** (idle 12h, max age 3 days) |
+| **Process limits** | Unlimited | **Timeouts enforced** (600s exec, 1800s agent) |
+| **Deployment** | Docker or native | **Native only** (systemd, no container overhead) |
 
 ### What SaferClaw Keeps Enabled
 
 SaferClaw is **not** about crippling OpenClaw. These powerful features remain fully functional:
 
-- Shell execution inside sandboxed Docker containers
+- Shell execution with sandbox mode enforced
 - Full coding agent capabilities (via Cursor CLI, Claude Code, or OpenCode)
 - Web search and web fetch
 - GitHub integration
@@ -91,7 +90,7 @@ SaferClaw is **not** about crippling OpenClaw. These powerful features remain fu
 - Cron jobs (daily briefings, scheduled tasks)
 - Sub-agents for parallel work
 - tmux for terminal session management
-- File read/write/edit inside sandbox workspace
+- File read/write/edit inside the scoped workspace
 - Whisper for voice message transcription
 
 ---
@@ -107,18 +106,20 @@ SaferClaw is **not** about crippling OpenClaw. These powerful features remain fu
                                                                    ┌────────────┼────────────┐
                                                                    │            │            │
                                                               ┌────▼────┐ ┌─────▼─────┐ ┌───▼────┐
-                                                              │ Docker  │ │ OpenRouter│ │ Memory │
-                                                              │ Sandbox │ │ (Grok 4.1)│ │ SQLite │
-                                                              │ (code)  │ │           │ │        │
+                                                              │ Sandbox │ │ OpenRouter│ │ Memory │
+                                                              │ (exec)  │ │ (Grok 4.1)│ │ SQLite │
+                                                              │         │ │           │ │        │
                                                               └─────────┘ └───────────┘ └────────┘
 ```
 
 - **You** message the bot on Telegram
 - **Nginx** terminates SSL and proxies webhooks to the gateway
-- **OpenClaw Gateway** processes messages, calls the AI model, runs tools
-- **Docker Sandbox** isolates all code execution (dropped capabilities, resource limits)
+- **OpenClaw Gateway** runs natively via systemd (no Docker), processes messages, calls the AI model, runs tools
+- **Sandbox** isolates exec calls with scoped workspace, timeouts, and process limits
 - **OpenRouter** routes to your chosen AI model (Grok 4.1 Fast recommended)
 - **Memory** persists conversations locally in SQLite (no external embedding services)
+
+> **Note**: This is a fully native deployment. OpenClaw runs directly on the host via systemd -- no Docker required. Security comes from systemd hardening, a dedicated user, Nginx reverse proxy, config-level sandbox enforcement, and restrictive tool/skill policies.
 
 ---
 
@@ -146,7 +147,7 @@ You need a Virtual Private Server to run SaferClaw 24/7. Here are good options:
 
 **Recommended specs:**
 - **OS**: Ubuntu 22.04 or 24.04 LTS
-- **RAM**: 2GB minimum (4GB recommended if running Docker sandbox)
+- **RAM**: 2GB minimum (4GB recommended for heavier workloads)
 - **CPU**: 1-2 vCPUs
 - **Storage**: 20GB+
 - **Network**: Public IPv4
@@ -550,12 +551,12 @@ model: { primary: "openrouter/x-ai/grok-4.1-fast" }
 
 ## Recommended Coding Workflow
 
-SaferClaw's agent can write code, but for heavy development work you'll want a dedicated **CLI-based agentic coder** running inside the sandbox. The config is already set up to support these:
+SaferClaw's agent can write code, but for heavy development work you'll want a dedicated **CLI-based agentic coder** running on the VPS. The config is already set up to support these:
 
 ### Option 1: Claude Code (Recommended)
 
 ```bash
-# Inside the sandbox, the agent can run:
+# The agent can invoke Claude Code on the VPS:
 claude-code "Build a REST API with Express and PostgreSQL"
 ```
 
@@ -566,7 +567,7 @@ Free during the current beta. Excellent at multi-file refactoring.
 [OpenCode](https://github.com/opencode-ai/opencode) -- open-source CLI coding agent.
 
 ```bash
-# Install in sandbox
+# Install on the VPS
 go install github.com/opencode-ai/opencode@latest
 
 # Use
@@ -587,7 +588,7 @@ Set `CURSOR_API_KEY` in your `.env.openclaw` to enable this.
 
 1. **You** message the Telegram bot with a high-level task
 2. **The bot** (Grok 4.1 Fast) plans the approach and spawns a coding sub-agent
-3. **The sub-agent** runs a CLI coder (Claude Code / OpenCode / Cursor) inside the Docker sandbox
+3. **The sub-agent** runs a CLI coder (Claude Code / OpenCode / Cursor) on the VPS
 4. **The CLI coder** writes and tests the code
 5. **The bot** reports results back to you on Telegram
 6. **You** review, approve, and the bot commits + pushes to GitHub
@@ -611,7 +612,7 @@ SaferClaw was built after a **7-phase security audit** of the OpenClaw codebase.
 | 5 | **Sandbox bypass via host parameter** -- elevated mode forces host execution | HIGH | Elevated mode disabled; sandbox `mode: "all"` enforced |
 | 6 | **DM scope cross-user leakage** -- default `dmScope: "main"` shares context | HIGH | Changed to `per-channel-peer` for full isolation |
 | 7 | **mDNS information disclosure** -- broadcasts presence on LAN | MEDIUM | `OPENCLAW_DISABLE_BONJOUR=1` |
-| 8 | **Environment variable injection** -- sandbox doesn't validate env vars | MEDIUM | Minimal env vars in Docker config; sensitive vars via `.env.openclaw` |
+| 8 | **Environment variable injection** -- sandbox doesn't validate env vars | MEDIUM | Minimal env vars exposed; sensitive vars loaded only via `.env.openclaw` |
 
 ### Defense in Depth
 
@@ -619,7 +620,7 @@ SaferClaw applies security at multiple layers:
 
 1. **Network**: Gateway bound to localhost; Nginx reverse proxy with TLS 1.2+; UFW firewall
 2. **Authentication**: Token-based gateway auth; Telegram allowlist (user ID only)
-3. **Isolation**: All code execution in Docker with dropped capabilities and resource limits
+3. **Isolation**: Sandbox mode enforced for all exec; scoped workspace; process timeouts
 4. **Least Privilege**: Systemd hardening (`PrivateTmp`, `ProtectHome`, `NoNewPrivileges`); dedicated user
 5. **Logging**: All tool calls logged with sensitive data redacted; log rotation
 6. **Monitoring**: Health check endpoint; systemd auto-restart on failure
@@ -693,14 +694,18 @@ sudo certbot renew --dry-run
 
 ### High memory usage
 
-Adjust Docker sandbox limits in `config.json5`:
+OpenClaw runs natively, so standard Linux tools apply:
 
-```json5
-docker: {
-    memory: "2g",    // Lower from 4g
-    cpus: 1.0,       // Lower from 2.0
-    pidsLimit: 200   // Lower from 500
-}
+```bash
+# Check what's using memory
+ps aux --sort=-%mem | head -10
+
+# Restart to clear accumulated memory
+sudo systemctl restart openclaw
+
+# Reduce concurrent agents in config.json5:
+#   agents.defaults.maxConcurrent: 1    (down from 3)
+#   agents.defaults.subagents.maxConcurrent: 2  (down from 5)
 ```
 
 ---
