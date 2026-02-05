@@ -6,21 +6,21 @@
 # Installs OpenClaw directly on the VPS with sudo for your user.
 # Replaces the Docker-based deployment.
 #
-# INSTRUCTIES:
-# 1. Vul de variabelen hieronder in
-# 2. Run als root: sudo bash vps-setup-native.sh
+# INSTRUCTIONS:
+# 1. Fill in the variables below
+# 2. Run as root: sudo bash vps-setup-native.sh
 #
 
 set -e
 
-# ===== VUL DEZE IN =====
-DOMAIN=""               # bijv: "myopenclaw.duckdns.org"
-DUCKDNS_TOKEN=""        # je token van duckdns.org
-DUCKDNS_SUBDOMAIN=""    # bijv: "myopenclaw"
-OPENCLAW_USER=""        # je VPS username
-# =======================
+# ===== FILL THESE IN =====
+DOMAIN=""               # e.g.: "myopenclaw.duckdns.org"
+DUCKDNS_TOKEN=""        # your token from duckdns.org
+DUCKDNS_SUBDOMAIN=""    # e.g.: "myopenclaw"
+OPENCLAW_USER=""        # your VPS username
+# =========================
 
-# Kleuren
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -52,13 +52,13 @@ fi
 OPENCLAW_HOME=$(eval echo "~$OPENCLAW_USER")
 
 # ============================================
-# STAP 1: System Update + Dependencies
+# Step 1: System Update + Dependencies
 # ============================================
 echo -e "${GREEN}[1/8] System update + dependencies...${NC}"
 apt-get update
 apt-get upgrade -y
 apt-get install -y \
-    curl wget git \
+    curl wget git rsync \
     python3 python3-pip python3-venv \
     ffmpeg \
     jq ripgrep fd-find \
@@ -69,7 +69,7 @@ apt-get install -y \
     openssh-client
 
 # ============================================
-# STAP 2: Add user to sudoers (NOPASSWD)
+# Step 2: Add user to sudoers (NOPASSWD)
 # ============================================
 echo -e "${GREEN}[2/8] Configuring sudo for $OPENCLAW_USER...${NC}"
 
@@ -93,7 +93,7 @@ fi
 echo -e "${GREEN}  $OPENCLAW_USER can now use sudo without password${NC}"
 
 # ============================================
-# STAP 3: Install Node.js 22 LTS
+# Step 3: Install Node.js 22 LTS
 # ============================================
 echo -e "${GREEN}[3/8] Installing Node.js 22 LTS...${NC}"
 
@@ -110,7 +110,7 @@ corepack enable
 echo "  pnpm enabled via corepack"
 
 # ============================================
-# STAP 4: Install Bun
+# Step 4: Install Bun
 # ============================================
 echo -e "${GREEN}[4/8] Installing Bun...${NC}"
 
@@ -123,7 +123,7 @@ else
 fi
 
 # ============================================
-# STAP 5: Install GitHub CLI
+# Step 5: Install GitHub CLI
 # ============================================
 echo -e "${GREEN}[5/8] Installing GitHub CLI...${NC}"
 
@@ -139,7 +139,7 @@ else
 fi
 
 # ============================================
-# STAP 6: Create OpenClaw directories
+# Step 6: Create OpenClaw directories
 # ============================================
 echo -e "${GREEN}[6/8] Creating OpenClaw directories...${NC}"
 
@@ -154,7 +154,7 @@ chown -R "$OPENCLAW_USER:$OPENCLAW_USER" /var/log/openclaw
 chmod 700 "$OPENCLAW_HOME/.openclaw"
 
 # ============================================
-# STAP 7: DuckDNS (optional)
+# Step 7: DuckDNS (optional)
 # ============================================
 if [ -n "$DUCKDNS_TOKEN" ] && [ -n "$DUCKDNS_SUBDOMAIN" ]; then
     echo -e "${GREEN}[7/8] Configuring DuckDNS...${NC}"
@@ -179,7 +179,7 @@ else
 fi
 
 # ============================================
-# STAP 8: Firewall
+# Step 8: Firewall
 # ============================================
 echo -e "${GREEN}[8/8] Configuring firewall...${NC}"
 
@@ -188,7 +188,7 @@ ufw allow 443/tcp comment 'HTTPS for OpenClaw' 2>/dev/null || true
 ufw reload 2>/dev/null || true
 
 # ============================================
-# STAP 9: Stop and remove Docker (optional)
+# Step 9: Stop and remove Docker (optional)
 # ============================================
 echo ""
 echo -e "${YELLOW}Docker cleanup:${NC}"
@@ -219,10 +219,13 @@ echo "  - Config dir: $OPENCLAW_HOME/.openclaw"
 echo "  - Log dir: /var/log/openclaw"
 echo ""
 echo "Next steps:"
-echo "  1. Upload openclaw-source to /opt/openclaw/"
-echo "  2. Run: cd /opt/openclaw && pnpm install && pnpm build"
-echo "  3. Copy config: cp config.json5 $OPENCLAW_HOME/.openclaw/"
-echo "  4. Copy .env: cp .env.openclaw /opt/openclaw/"
-echo "  5. Install service: cp openclaw.service /etc/systemd/system/"
-echo "  6. Start: systemctl enable openclaw && systemctl start openclaw"
+echo "  1. Run the install script (copies bundled source, builds, and configures):"
+echo "     bash ~/saferclaw/install-openclaw.sh"
+echo "  2. Edit config: nano $OPENCLAW_HOME/.openclaw/config.json5"
+echo "     (replace placeholder Telegram user ID and YOUR_DOMAIN)"
+echo "  3. Create .env: cp ~/saferclaw/.env.template /opt/openclaw/.env.openclaw"
+echo "     nano /opt/openclaw/.env.openclaw  (fill in API keys)"
+echo "  4. Setup SSL: sudo bash ~/saferclaw/setup-ssl.sh"
+echo "  5. Setup webhook: bash ~/saferclaw/setup-webhook.sh"
+echo "  6. Start: sudo systemctl start openclaw"
 echo ""

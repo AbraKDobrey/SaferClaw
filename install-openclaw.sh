@@ -7,11 +7,12 @@
 #   bash install-openclaw.sh
 #
 # This script:
-# 1. Installs pnpm dependencies
-# 2. Builds the application
-# 3. Copies config files
-# 4. Installs the systemd service
-# 5. Starts OpenClaw
+# 1. Copies bundled source to /opt/openclaw (if not already present)
+# 2. Installs pnpm dependencies
+# 3. Builds the application
+# 4. Copies config files
+# 5. Installs the systemd service
+# 6. Starts OpenClaw
 #
 
 set -e
@@ -20,7 +21,7 @@ INSTALL_DIR="/opt/openclaw"
 CONFIG_DIR="$HOME/.openclaw"
 DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Kleuren
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -51,34 +52,48 @@ if ! command -v pnpm &>/dev/null; then
 fi
 
 # ============================================
-# STAP 1: Install dependencies
+# Step 1: Copy bundled source (if needed)
 # ============================================
-echo -e "${GREEN}[1/6] Installing dependencies...${NC}"
-cd "$INSTALL_DIR"
+echo -e "${GREEN}[1/8] Checking source...${NC}"
 
-# Check if source exists
+BUNDLED_SOURCE="$DEPLOY_DIR/openclaw-source"
+
 if [ ! -f "$INSTALL_DIR/package.json" ]; then
-    echo -e "${RED}ERROR: OpenClaw source not found at $INSTALL_DIR${NC}"
-    echo "Upload openclaw-source first:"
-    echo "  scp -r openclaw-source/* YOUR_USER@YOUR_VPS_IP:/opt/openclaw/"
-    exit 1
+    if [ -d "$BUNDLED_SOURCE" ] && [ -f "$BUNDLED_SOURCE/package.json" ]; then
+        echo "  Copying bundled source to $INSTALL_DIR..."
+        sudo mkdir -p "$INSTALL_DIR"
+        sudo chown "$(whoami):$(whoami)" "$INSTALL_DIR"
+        rsync -a --exclude node_modules --exclude dist "$BUNDLED_SOURCE/" "$INSTALL_DIR/"
+        echo -e "${GREEN}  Source copied${NC}"
+    else
+        echo -e "${RED}ERROR: No source found at $INSTALL_DIR and no bundled source available${NC}"
+        exit 1
+    fi
+else
+    echo "  Source already present at $INSTALL_DIR"
 fi
+
+# ============================================
+# Step 2: Install dependencies
+# ============================================
+echo -e "${GREEN}[2/8] Installing dependencies...${NC}"
+cd "$INSTALL_DIR"
 
 pnpm install --frozen-lockfile
 echo -e "${GREEN}  Dependencies installed${NC}"
 
 # ============================================
-# STAP 2: Build
+# Step 3: Build
 # ============================================
-echo -e "${GREEN}[2/6] Building OpenClaw...${NC}"
+echo -e "${GREEN}[3/8] Building OpenClaw...${NC}"
 OPENCLAW_A2UI_SKIP_MISSING=1 pnpm build
 OPENCLAW_PREFER_PNPM=1 pnpm ui:build
 echo -e "${GREEN}  Build complete${NC}"
 
 # ============================================
-# STAP 3: Copy config
+# Step 4: Copy config
 # ============================================
-echo -e "${GREEN}[3/6] Setting up config...${NC}"
+echo -e "${GREEN}[4/8] Setting up config...${NC}"
 mkdir -p "$CONFIG_DIR"
 
 if [ -f "$DEPLOY_DIR/config.json5" ] && [ ! -f "$CONFIG_DIR/config.json5" ]; then
@@ -91,9 +106,9 @@ else
 fi
 
 # ============================================
-# STAP 4: Copy env file
+# Step 5: Copy env file
 # ============================================
-echo -e "${GREEN}[4/6] Setting up environment...${NC}"
+echo -e "${GREEN}[5/8] Setting up environment...${NC}"
 
 if [ -f "$DEPLOY_DIR/.env.openclaw" ] && [ ! -f "$INSTALL_DIR/.env.openclaw" ]; then
     cp "$DEPLOY_DIR/.env.openclaw" "$INSTALL_DIR/.env.openclaw"
@@ -106,9 +121,9 @@ else
 fi
 
 # ============================================
-# STAP 5: Copy skills
+# Step 6: Copy skills
 # ============================================
-echo -e "${GREEN}[5/6] Setting up skills...${NC}"
+echo -e "${GREEN}[6/8] Setting up skills...${NC}"
 
 if [ -d "$DEPLOY_DIR/skills" ]; then
     mkdir -p "$INSTALL_DIR/skills"
@@ -119,16 +134,28 @@ else
 fi
 
 # ============================================
-# STAP 6: Install systemd service
+# Step 7: Copy nginx config
 # ============================================
-echo -e "${GREEN}[6/6] Installing systemd service...${NC}"
+echo -e "${GREEN}[7/8] Copying nginx config...${NC}"
+
+if [ -f "$DEPLOY_DIR/nginx-openclaw.conf" ]; then
+    cp "$DEPLOY_DIR/nginx-openclaw.conf" "$INSTALL_DIR/nginx-openclaw.conf"
+    echo "  Copied nginx-openclaw.conf to $INSTALL_DIR"
+else
+    echo -e "${YELLOW}  WARNING: nginx-openclaw.conf not found in deploy directory.${NC}"
+fi
+
+# ============================================
+# Step 8: Install systemd service
+# ============================================
+echo -e "${GREEN}[8/8] Installing systemd service...${NC}"
 
 # Copy cleanup script
 cp "$DEPLOY_DIR/startup-cleanup.sh" "$INSTALL_DIR/startup-cleanup.sh"
 chmod +x "$INSTALL_DIR/startup-cleanup.sh"
 
-# Install service
-sudo cp "$DEPLOY_DIR/openclaw.service" /etc/systemd/system/openclaw.service
+# Install service (replace YOUR_USER placeholder with actual username)
+sed "s/YOUR_USER/$(whoami)/g" "$DEPLOY_DIR/openclaw.service" | sudo tee /etc/systemd/system/openclaw.service > /dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable openclaw
 

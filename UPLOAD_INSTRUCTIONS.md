@@ -4,70 +4,71 @@
 
 - VPS with Ubuntu 22.04/24.04
 - SSH access to your VPS user
-- OpenClaw source code
 
-## Stap 1: Upload deployment files
+> **Note**: OpenClaw source code is bundled in `openclaw-source/`. No separate download needed.
+
+## Step 1: Upload deployment files + source
 
 ```bash
 ./upload-to-vps.exp upload
 ```
 
-## Stap 2: Setup VPS (eenmalig)
+This uploads the deployment scripts and config to `~/saferclaw/` on the VPS.
 
-SSH naar je VPS en run:
-
-```bash
-sudo bash ~/openclaw-deploy/vps-setup-native.sh
-```
-
-Dit installeert:
-- Node.js 22 + pnpm
-- Bun (voor build scripts)
-- Nginx, certbot
-- System tools (git, tmux, ffmpeg, ripgrep, etc.)
-- Sudo NOPASSWD voor je user
-
-## Stap 3: Upload OpenClaw source
+Then upload the bundled source:
 
 ```bash
 ./upload-to-vps.exp upload-source
 ```
 
-Of handmatig:
+This copies `openclaw-source/` to `/opt/openclaw/` on the VPS.
+
+## Step 2: Setup VPS (one-time)
+
+SSH into your VPS and run:
 
 ```bash
-scp -r -P YOUR_SSH_PORT -i ~/.ssh/vps_openclaw openclaw-source/* YOUR_USER@YOUR_VPS_IP:/opt/openclaw/
+sudo bash ~/saferclaw/vps-setup-native.sh
 ```
 
-## Stap 4: Install & Build
+This installs:
+- Node.js 22 + pnpm
+- Bun (for build scripts)
+- Nginx, certbot
+- System tools (git, tmux, ffmpeg, ripgrep, etc.)
+- Sudo NOPASSWD for your user
+
+## Step 3: Install & Build
 
 ```bash
 ./upload-to-vps.exp install
 ```
 
-Of handmatig op de VPS:
+Or manually on the VPS:
 
 ```bash
-bash ~/openclaw-deploy/install-openclaw.sh
+bash ~/saferclaw/install-openclaw.sh
 ```
 
-## Stap 5: SSL certificaat
+> The install script automatically copies the bundled source to `/opt/openclaw/` if it's not already there.
 
-Op de VPS:
+## Step 4: SSL Certificate
+
+On the VPS:
 
 ```bash
-sudo bash ~/openclaw-deploy/setup-ssl.sh
+sudo bash ~/saferclaw/setup-ssl.sh
 ```
 
-## Stap 6: Telegram webhook
+## Step 5: Telegram Webhook
 
-Op de VPS:
+On the VPS:
 
 ```bash
-sudo bash ~/openclaw-deploy/setup-webhook.sh
+bash ~/saferclaw/setup-webhook.sh
 ```
 
-## Dagelijks gebruik
+## Daily Usage
 
 ```bash
 # Status
@@ -80,12 +81,12 @@ journalctl -u openclaw -f
 sudo systemctl restart openclaw
 
 # Update
-bash ~/openclaw-deploy/update-openclaw.sh
+bash ~/saferclaw/update-openclaw.sh
 ```
 
-## Migratie van Docker
+## Migration from Docker
 
-Als je al een Docker deployment hebt draaien:
+If you already have a Docker deployment running:
 
 ```bash
 # 1. Stop Docker container
@@ -96,7 +97,7 @@ docker rm -f openclaw-gateway
 # Config is at /home/YOUR_USER/.openclaw/ already
 
 # 3. Install native
-bash ~/openclaw-deploy/install-openclaw.sh
+bash ~/saferclaw/install-openclaw.sh
 
 # 4. (Optional) Remove Docker
 sudo apt-get remove -y docker.io docker-ce docker-ce-cli containerd.io

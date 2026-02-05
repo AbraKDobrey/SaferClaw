@@ -2,10 +2,10 @@
 # OpenClaw Systemd Service (Native - No Docker)
 # ==============================================
 #
-# BEFORE USING: Replace YOUR_USER with your actual VPS username.
+# YOUR_USER is automatically replaced by install-openclaw.sh during installation.
 #
-# Installation:
-#   sudo cp openclaw.service /etc/systemd/system/
+# Installation (handled by install-openclaw.sh):
+#   sed "s/YOUR_USER/$(whoami)/g" openclaw.service | sudo tee /etc/systemd/system/openclaw.service
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable openclaw
 #   sudo systemctl start openclaw
@@ -54,8 +54,16 @@ TimeoutStartSec=30
 TimeoutStopSec=30
 
 # Security hardening
+NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=read-only
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+ReadWritePaths=/opt/openclaw /var/log/openclaw /home/YOUR_USER/.openclaw
 
 # Logging
 StandardOutput=journal

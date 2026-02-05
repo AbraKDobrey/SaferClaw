@@ -18,7 +18,7 @@ CONFIG_DIR="$HOME/.openclaw"
 BACKUP_BASE="/opt/openclaw/backups"
 BACKUP_DIR="$BACKUP_BASE/$(date +%Y%m%d_%H%M%S)"
 
-# Kleuren
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -53,11 +53,17 @@ sleep 2
 echo -e "${GREEN}[3/6]${NC} Updating source..."
 cd "$INSTALL_DIR"
 
-if [ -d ".git" ]; then
+# Check for bundled source (SaferClaw repo includes openclaw-source/)
+SAFERCLAW_SOURCE="$HOME/saferclaw/openclaw-source"
+if [ -d "$SAFERCLAW_SOURCE" ] && [ -f "$SAFERCLAW_SOURCE/package.json" ]; then
+    echo "  Syncing from bundled SaferClaw source..."
+    rsync -a --exclude node_modules --exclude dist --delete "$SAFERCLAW_SOURCE/" "$INSTALL_DIR/"
+elif [ -d ".git" ]; then
     echo "  Pulling latest changes..."
     git pull origin main
 else
-    echo -e "${YELLOW}  No git repo - upload new source manually${NC}"
+    echo -e "${YELLOW}  No git repo and no bundled source found at $SAFERCLAW_SOURCE${NC}"
+    echo -e "${YELLOW}  To update: git pull the SaferClaw repo at ~/saferclaw, then re-run this script${NC}"
 fi
 
 # 4. Rebuild

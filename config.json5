@@ -2,11 +2,11 @@
 // OpenClaw Autonomous Bot Configuration
 // ====================================
 // 
-// INSTRUCTIES:
-// 1. Kopieer dit bestand naar ~/.openclaw/config.json5
-// 2. Vervang YOUR_TELEGRAM_USER_ID met je echte Telegram user ID
-// 3. Vervang YOUR_DOMAIN met je domein (bijv: myopenclaw.duckdns.org)
-// 4. Controleer of alle tokens in .env.openclaw staan
+// INSTRUCTIONS:
+// 1. Copy this file to ~/.openclaw/config.json5
+// 2. Replace the placeholder Telegram user ID (0) with your real Telegram user ID
+// 3. Replace YOUR_DOMAIN with your domain (e.g.: myopenclaw.duckdns.org)
+// 4. Verify all tokens are set in .env.openclaw
 //
 {
   // ===== META =====
@@ -29,14 +29,14 @@
     dmScope: "per-channel-peer"
   },
 
-  // ===== DISCOVERY - UIT =====
+  // ===== DISCOVERY - OFF =====
   discovery: {
     mdns: {
-      mode: "off"  // KRITIEK: geen LAN discovery
+      mode: "off"  // CRITICAL: no LAN discovery
     }
   },
 
-  // ===== DIAGNOSTICS - UIT =====
+  // ===== DIAGNOSTICS - OFF =====
   diagnostics: {
     otel: {
       enabled: false
@@ -74,7 +74,7 @@
     reload: { mode: "off" }
   },
 
-  // ===== TOOLS - AUTONOOM =====
+  // ===== TOOLS - AUTONOMOUS =====
   tools: {
     profile: "full",
     
@@ -88,9 +88,10 @@
     },
     
     exec: {
-      host: "sandbox",
+      host: "local",
       security: "full",
       ask: "off",
+      autoAllowSkills: false,  // CRITICAL: no auto-approve of skill binaries
       timeoutSec: 600,
       backgroundMs: 30000,
       cleanupMs: 300000,
@@ -143,44 +144,17 @@
     }
   },
 
-  // ===== AGENTS - SANDBOX MET NETWERK =====
+  // ===== AGENTS - NATIVE (NO DOCKER) =====
   agents: {
     defaults: {
       // Default model - via OpenRouter
       model: { primary: "openrouter/x-ai/grok-4.1-fast" },
       
       sandbox: {
-        mode: "all",
-        scope: "agent",  // PERSISTENT workspace
-        workspaceAccess: "rw",
-        workspaceRoot: "/workspace",
-        
-        docker: {
-          image: "openclaw-sandbox:full",
-          containerPrefix: "oclaw-",
-          workdir: "/workspace",
-          readOnlyRoot: false,
-          network: "bridge",  // NETWERK AAN
-          capDrop: ["SYS_ADMIN", "NET_ADMIN", "SYS_PTRACE"],
-          tmpfs: ["/tmp", "/var/tmp"],
-          memory: "4g",
-          cpus: 2.0,
-          pidsLimit: 500,
-          env: {
-            LANG: "C.UTF-8",
-            HOME: "/home/claw",
-            PATH: "/home/claw/.local/bin:/usr/local/bin:/usr/bin:/bin",
-            CURSOR_API_KEY: "${CURSOR_API_KEY}"
-          }
-        },
+        mode: "off",  // No Docker - tools run directly on host
         
         browser: {
           enabled: false
-        },
-        
-        prune: {
-          idleHours: 12,
-          maxAgeDays: 3
         }
       },
       
@@ -217,9 +191,8 @@
       
       dmPolicy: "allowlist",
       allowFrom: [
-        // VERVANG MET JE TELEGRAM USER ID
-        // Vind dit met @userinfobot in Telegram
-        YOUR_TELEGRAM_USER_ID
+        // REPLACE with your Telegram user ID (find via @userinfobot in Telegram)
+        0
       ],
       
       groupPolicy: "disabled",
@@ -238,10 +211,10 @@
       dmHistoryLimit: 200,
       textChunkLimit: 4000
       
-      // Webhook configuratie - VERVANG YOUR_DOMAIN
+      // Webhook configuration - REPLACE YOUR_DOMAIN
       webhookUrl: "https://YOUR_DOMAIN/tg/webhook",
       webhookPath: "/tg/webhook"
-      // webhookSecret wordt via env var TELEGRAM_WEBHOOK_SECRET gezet
+      // webhookSecret is set via env var TELEGRAM_WEBHOOK_SECRET
     },
     
     defaults: {
@@ -300,29 +273,29 @@
         wakeMode: "now",
         payload: {
           kind: "agentTurn",
-          message: "Goedemorgen! Wat staat er vandaag op de planning?",
+          message: "Good morning! What's on the schedule for today?",
           deliver: true,
           channel: "telegram",
-          // VERVANG MET JE TELEGRAM USER ID
-          to: "YOUR_TELEGRAM_USER_ID"
+          // REPLACE with your Telegram user ID
+          to: "0"
         }
       }
     ]
   },
 
-  // ===== APPROVALS - UIT =====
+  // ===== APPROVALS - OFF =====
   approvals: {
     exec: {
       enabled: false
     }
   },
 
-  // ===== BROWSER - UIT =====
+  // ===== BROWSER - OFF =====
   browser: {
     enabled: false
   },
 
-  // ===== PLUGINS - UIT =====
+  // ===== PLUGINS - OFF =====
   plugins: {
     enabled: false
   }

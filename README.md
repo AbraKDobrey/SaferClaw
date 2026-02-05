@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="saferclaw-banner.png" alt="SaferClaw" width="100%">
+</p>
+
 # SaferClaw
 
 **A security-hardened deployment kit for [OpenClaw](https://github.com/openclaw/openclaw) -- the open-source autonomous AI agent.**
@@ -56,7 +60,7 @@ OpenClaw out of the box ships with **permissive defaults** designed for local de
 |------|-------------------|-----------|
 | **Elevated mode** | Available (`full` bypasses ALL security) | **Disabled entirely** |
 | **Auto-allow skills** | Skills can auto-approve their own binaries | **Disabled** -- every binary needs explicit approval |
-| **Sandbox** | Optional, often `off` | **Mandatory** (`mode: "all"`) -- all exec is sandboxed |
+| **Sandbox** | Optional, often `off` | **Off** (native deployment, no Docker); security via systemd hardening + elevated mode disabled |
 | **Gateway binding** | `0.0.0.0` (open to internet) | **`loopback`** (localhost only, behind Nginx) |
 | **Gateway auth** | Optional | **Token-based** (random 64-char hex) |
 | **Control UI** | Enabled (web dashboard) | **Disabled** (attack surface reduction) |
@@ -81,7 +85,7 @@ OpenClaw out of the box ships with **permissive defaults** designed for local de
 
 SaferClaw is **not** about crippling OpenClaw. These powerful features remain fully functional:
 
-- Shell execution with sandbox mode enforced
+- Shell execution (security via systemd hardening, elevated mode disabled, and scoped workspace)
 - Full coding agent capabilities (via Cursor CLI, Claude Code, or OpenCode)
 - Web search and web fetch
 - GitHub integration
@@ -285,7 +289,7 @@ You need keys for several services. Here's where to get each one:
 2. Send `/newbot`
 3. Give it a name and username
 4. Copy the **bot token** (looks like `123456789:ABCdefGHIjklMNOpqrsTUVwxyz`)
-5. Message [@userinfobot](https://t.me/userinfobot) to get your **Telegram user ID** (a number like `1278510854`)
+5. Message [@userinfobot](https://t.me/userinfobot) to get your **Telegram user ID** (a number like `123456789`)
 
 ### 3.2 OpenRouter API Key (Recommended AI Provider)
 
@@ -337,10 +341,12 @@ Telegram webhooks require HTTPS, which requires a domain name. DuckDNS gives you
 ```bash
 ssh openclaw-vps
 
-# Clone this repo
+# Clone this repo (includes OpenClaw source code)
 git clone https://github.com/AbraKDobrey/SaferClaw.git ~/saferclaw
 cd ~/saferclaw
 ```
+
+> **Note**: This repo bundles the OpenClaw source code in `openclaw-source/`. You do NOT need to clone the upstream OpenClaw repo separately. The install script handles copying the source automatically.
 
 ### 5.2 Run VPS Setup
 
@@ -370,16 +376,6 @@ This installs:
 - System tools (git, tmux, ffmpeg, ripgrep, jq, python3)
 - Firewall rules
 - DuckDNS auto-updater (cron every 5 min)
-
-### 5.3 Install OpenClaw Source
-
-```bash
-# Clone the official OpenClaw repo
-sudo mkdir -p /opt/openclaw
-sudo chown $(whoami):$(whoami) /opt/openclaw
-git clone https://github.com/openclaw/openclaw.git /opt/openclaw
-cd /opt/openclaw
-```
 
 ---
 
@@ -431,6 +427,7 @@ bash ~/saferclaw/install-openclaw.sh
 ```
 
 This handles:
+- Copying the bundled source to `/opt/openclaw/` (if not already present)
 - `pnpm install` for dependencies
 - Building the application
 - Copying config files
@@ -509,10 +506,22 @@ SaferClaw includes an update script with **automatic rollback** if the update fa
 bash ~/saferclaw/update-openclaw.sh
 ```
 
+To get the latest source, first update your SaferClaw clone:
+
+```bash
+cd ~/saferclaw && git pull
+```
+
+Then run the update script:
+
+```bash
+bash ~/saferclaw/update-openclaw.sh
+```
+
 This will:
 1. Backup your current config and dist
 2. Stop OpenClaw
-3. Pull latest changes (if git repo) or wait for manual upload
+3. Sync the latest bundled source to `/opt/openclaw/`
 4. Rebuild
 5. Restart
 6. Run health check
@@ -609,7 +618,7 @@ SaferClaw was built after a **7-phase security audit** of the OpenClaw codebase.
 | 2 | **Elevated mode bypass** -- `elevated=full` disables ALL security checks and approval prompts | CRITICAL | `elevated.enabled: false` -- entire feature disabled |
 | 3 | **Skill script execution** -- skills can contain unvalidated executable scripts | HIGH | Dangerous skills (`skill-creator`, `clawhub`, `mcporter`) disabled |
 | 4 | **Workspace skill override** -- workspace skills can replace bundled skills | HIGH | Workspace skill loading restricted; skill allowlist enforced |
-| 5 | **Sandbox bypass via host parameter** -- elevated mode forces host execution | HIGH | Elevated mode disabled; sandbox `mode: "all"` enforced |
+| 5 | **Sandbox bypass via host parameter** -- elevated mode forces host execution | HIGH | Elevated mode disabled; native deployment uses systemd hardening instead of Docker sandbox |
 | 6 | **DM scope cross-user leakage** -- default `dmScope: "main"` shares context | HIGH | Changed to `per-channel-peer` for full isolation |
 | 7 | **mDNS information disclosure** -- broadcasts presence on LAN | MEDIUM | `OPENCLAW_DISABLE_BONJOUR=1` |
 | 8 | **Environment variable injection** -- sandbox doesn't validate env vars | MEDIUM | Minimal env vars exposed; sensitive vars loaded only via `.env.openclaw` |
@@ -620,7 +629,7 @@ SaferClaw applies security at multiple layers:
 
 1. **Network**: Gateway bound to localhost; Nginx reverse proxy with TLS 1.2+; UFW firewall
 2. **Authentication**: Token-based gateway auth; Telegram allowlist (user ID only)
-3. **Isolation**: Sandbox mode enforced for all exec; scoped workspace; process timeouts
+3. **Isolation**: Native deployment (no Docker sandbox); elevated mode disabled; scoped workspace; process timeouts
 4. **Least Privilege**: Systemd hardening (`PrivateTmp`, `ProtectHome`, `NoNewPrivileges`); dedicated user
 5. **Logging**: All tool calls logged with sensitive data redacted; log rotation
 6. **Monitoring**: Health check endpoint; systemd auto-restart on failure
@@ -631,6 +640,7 @@ SaferClaw applies security at multiple layers:
 
 | File | Purpose |
 |------|---------|
+| `openclaw-source/` | Bundled OpenClaw source code (security-audited) |
 | `config.json5` | Main SaferClaw configuration (hardened settings) |
 | `.env.template` | Template for environment variables / secrets |
 | `vps-setup-native.sh` | One-time VPS setup (Node.js, Nginx, tools) |
@@ -660,8 +670,8 @@ journalctl -u openclaw -n 50
 # Verify webhook is set
 curl -s "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo" | jq .
 
-# Test Nginx is proxying correctly
-curl -I https://your-domain.duckdns.org/health
+# Test OpenClaw is responding (direct, bypassing Nginx)
+curl -s http://localhost:47832/health
 ```
 
 ### "Permission denied" errors

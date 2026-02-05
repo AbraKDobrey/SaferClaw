@@ -1,72 +1,72 @@
 #!/bin/bash
 # setup-ssl.sh
-# SSL Certificaat en Nginx Setup voor OpenClaw
+# SSL Certificate and Nginx Setup for OpenClaw
 # =============================================
 #
-# INSTRUCTIES:
-# 1. Vul de variabelen hieronder in
-# 2. Run NA vps-setup.sh en NA upload van files
-# 3. Run als root: sudo bash setup-ssl.sh
+# INSTRUCTIONS:
+# 1. Fill in the variables below
+# 2. Run AFTER vps-setup.sh and AFTER uploading files
+# 3. Run as root: sudo bash setup-ssl.sh
 #
 
 set -e
 
-# ===== VUL DEZE IN =====
-DOMAIN=""  # bijv: "myopenclaw.duckdns.org"
-EMAIL=""   # je email voor Let's Encrypt notificaties
-# =======================
+# ===== FILL THESE IN =====
+DOMAIN=""  # e.g.: "myopenclaw.duckdns.org"
+EMAIL=""   # your email for Let's Encrypt notifications
+# =========================
 
-# Validatie
+# Validation
 if [ -z "$DOMAIN" ] || [ -z "$EMAIL" ]; then
-    echo "ERROR: Vul DOMAIN en EMAIL variabelen in!"
+    echo "ERROR: Fill in the DOMAIN and EMAIL variables!"
     echo ""
-    echo "Benodigde variabelen:"
-    echo "  DOMAIN - Je domein (bijv: myopenclaw.duckdns.org)"
-    echo "  EMAIL  - Je email voor Let's Encrypt"
+    echo "Required variables:"
+    echo "  DOMAIN - Your domain (e.g.: myopenclaw.duckdns.org)"
+    echo "  EMAIL  - Your email for Let's Encrypt"
     exit 1
 fi
 
 echo "========================================="
-echo "   SSL Setup voor ${DOMAIN}"
+echo "   SSL Setup for ${DOMAIN}"
 echo "========================================="
 echo ""
 
 # Check root
 if [ "$EUID" -ne 0 ]; then 
-    echo "ERROR: Run als root (sudo bash setup-ssl.sh)"
+    echo "ERROR: Run as root (sudo bash setup-ssl.sh)"
     exit 1
 fi
 
-# Check of nginx config bestaat
+# Check if nginx config exists
 if [ ! -f "/opt/openclaw/nginx-openclaw.conf" ]; then
-    echo "ERROR: nginx-openclaw.conf niet gevonden in /opt/openclaw/"
-    echo "Upload eerst alle files naar /opt/openclaw/"
+    echo "ERROR: nginx-openclaw.conf not found in /opt/openclaw/"
+    echo "Run install-openclaw.sh first to copy all files to /opt/openclaw/"
     exit 1
 fi
 
-echo "[1/4] Tijdelijke nginx config voor certbot..."
+echo "[1/4] Temporary nginx config for certbot..."
 
-# Stop nginx tijdelijk
+# Stop nginx temporarily
 systemctl stop nginx
 
-echo "[2/4] SSL certificaat verkrijgen..."
+echo "[2/4] Obtaining SSL certificate..."
 
-# Verkrijg certificaat (standalone mode)
+# Obtain certificate (standalone mode)
 certbot certonly --standalone \
     --non-interactive \
     --agree-tos \
     --email ${EMAIL} \
     --domain ${DOMAIN}
 
-echo "[3/4] Nginx configureren..."
+echo "[3/4] Configuring Nginx..."
 
 # Update domain in nginx config
 sed -i "s/YOUR_DOMAIN/${DOMAIN}/g" /opt/openclaw/nginx-openclaw.conf
 
-# Kopieer OpenClaw nginx config
+# Copy OpenClaw nginx config
 cp /opt/openclaw/nginx-openclaw.conf /etc/nginx/sites-available/openclaw
 
-# Verwijder default site
+# Remove default site
 rm -f /etc/nginx/sites-enabled/default
 
 # Enable OpenClaw site
@@ -75,22 +75,22 @@ ln -sf /etc/nginx/sites-available/openclaw /etc/nginx/sites-enabled/openclaw
 # Test nginx config
 nginx -t
 
-echo "[4/4] Nginx starten..."
+echo "[4/4] Starting Nginx..."
 
 systemctl start nginx
 systemctl enable nginx
 
 echo ""
 echo "========================================="
-echo "   SSL Setup Compleet!"
+echo "   SSL Setup Complete!"
 echo "========================================="
 echo ""
-echo "HTTPS actief op: https://${DOMAIN}"
+echo "HTTPS active at: https://${DOMAIN}"
 echo ""
-echo "Test met:"
-echo "  curl -I https://${DOMAIN}/health"
+echo "Test with:"
+echo "  curl -s http://localhost:47832/health"
 echo ""
-echo "Volgende stap: Docker images bouwen en starten"
-echo "  cd /opt/openclaw"
-echo "  docker compose up -d"
+echo "Next step: Start the OpenClaw service"
+echo "  sudo systemctl start openclaw"
+echo "  sudo systemctl enable openclaw"
 echo ""

@@ -1,27 +1,27 @@
 #!/bin/bash
 # setup-webhook.sh
-# Telegram Webhook Configuratie
-# =============================
+# Telegram Webhook Configuration
+# ===============================
 #
-# INSTRUCTIES:
-# 1. Vul de variabelen hieronder in
-# 2. Run dit NADAT Docker draait en SSL werkt
+# INSTRUCTIONS:
+# 1. Fill in the variables below
+# 2. Run this AFTER the OpenClaw service is running and SSL is working
 #
 
-# ===== VUL DEZE IN =====
-DOMAIN=""           # bijv: "myopenclaw.duckdns.org"
-BOT_TOKEN=""        # van @BotFather
-WEBHOOK_SECRET=""   # genereer met: openssl rand -hex 16
-# =======================
+# ===== FILL THESE IN =====
+DOMAIN=""           # e.g.: "myopenclaw.duckdns.org"
+BOT_TOKEN=""        # from @BotFather
+WEBHOOK_SECRET=""   # generate with: openssl rand -hex 16
+# =========================
 
-# Validatie
+# Validation
 if [ -z "$DOMAIN" ] || [ -z "$BOT_TOKEN" ] || [ -z "$WEBHOOK_SECRET" ]; then
-    echo "ERROR: Vul alle variabelen in!"
+    echo "ERROR: Fill in all variables!"
     echo ""
-    echo "Benodigde variabelen:"
-    echo "  DOMAIN         - Je domein (bijv: myopenclaw.duckdns.org)"
-    echo "  BOT_TOKEN      - Telegram bot token van @BotFather"
-    echo "  WEBHOOK_SECRET - Genereer met: openssl rand -hex 16"
+    echo "Required variables:"
+    echo "  DOMAIN         - Your domain (e.g.: myopenclaw.duckdns.org)"
+    echo "  BOT_TOKEN      - Telegram bot token from @BotFather"
+    echo "  WEBHOOK_SECRET - Generate with: openssl rand -hex 16"
     exit 1
 fi
 
@@ -34,13 +34,13 @@ echo ""
 echo "Webhook URL: ${WEBHOOK_URL}"
 echo ""
 
-# 1. Verwijder oude webhook (indien aanwezig)
-echo "[1/3] Oude webhook verwijderen..."
+# 1. Remove old webhook (if present)
+echo "[1/3] Removing old webhook..."
 curl -s "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook" | jq .
 
-# 2. Set nieuwe webhook
+# 2. Set new webhook
 echo ""
-echo "[2/3] Nieuwe webhook instellen..."
+echo "[2/3] Setting new webhook..."
 RESULT=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook" \
     -d "url=${WEBHOOK_URL}" \
     -d "secret_token=${WEBHOOK_SECRET}" \
@@ -48,15 +48,15 @@ RESULT=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook" \
 
 echo "${RESULT}" | jq .
 
-# 3. Verifieer
+# 3. Verify
 echo ""
-echo "[3/3] Webhook info verifiëren..."
+echo "[3/3] Verifying webhook info..."
 curl -s "https://api.telegram.org/bot${BOT_TOKEN}/getWebhookInfo" | jq .
 
 echo ""
 echo "========================================="
-echo "   Webhook Setup Compleet!"
+echo "   Webhook Setup Complete!"
 echo "========================================="
 echo ""
-echo "Test de bot door een bericht te sturen in Telegram"
+echo "Test the bot by sending a message in Telegram"
 echo ""
