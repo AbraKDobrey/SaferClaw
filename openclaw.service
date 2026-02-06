@@ -32,7 +32,8 @@ EnvironmentFile=/opt/openclaw/.env.openclaw
 Environment=NODE_ENV=production
 Environment=OPENCLAW_PREFER_PNPM=1
 Environment=OPENCLAW_DISABLE_BONJOUR=1
-Environment=PATH=/home/YOUR_USER/.bun/bin:/usr/local/bin:/usr/bin:/bin
+Environment=OPENCLAW_CONFIG_PATH=/home/YOUR_USER/.openclaw/config.json5
+Environment=PATH=/home/YOUR_USER/.local/bin:/home/YOUR_USER/.bun/bin:/usr/local/bin:/usr/bin:/bin
 
 # Pre-start cleanup
 ExecStartPre=/opt/openclaw/startup-cleanup.sh

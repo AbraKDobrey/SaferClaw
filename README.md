@@ -59,7 +59,7 @@ OpenClaw out of the box ships with **permissive defaults** designed for local de
 | Area | OpenClaw (Default) | SaferClaw |
 |------|-------------------|-----------|
 | **Elevated mode** | Available (`full` bypasses ALL security) | **Disabled entirely** |
-| **Auto-allow skills** | Skills can auto-approve their own binaries | **Disabled** -- every binary needs explicit approval |
+| **Auto-allow skills** | Skills can auto-approve their own binaries | **Disabled** -- dangerous skills removed from config |
 | **Sandbox** | Optional, often `off` | **Off** (native deployment, no Docker); security via systemd hardening + elevated mode disabled |
 | **Gateway binding** | `0.0.0.0` (open to internet) | **`loopback`** (localhost only, behind Nginx) |
 | **Gateway auth** | Optional | **Token-based** (random 64-char hex) |
@@ -76,7 +76,7 @@ OpenClaw out of the box ships with **permissive defaults** designed for local de
 | **Workspace access** | `rw` on host filesystem | **`rw` scoped to `/workspace` only** |
 | **Sensitive data in logs** | Full content | **Redacted** (`redactSensitive: "tools"`) |
 | **Browser automation** | Enabled (Puppeteer) | **Disabled** |
-| **Plugins** | Enabled | **Disabled** |
+| **Plugins** | Enabled | **Enabled** (only Telegram plugin active; dangerous plugins disabled) |
 | **Systemd hardening** | None | **`PrivateTmp`, `ProtectHome`, `NoNewPrivileges`** |
 | **Process limits** | Unlimited | **Timeouts enforced** (600s exec, 1800s agent) |
 | **Deployment** | Docker or native | **Native only** (systemd, no container overhead) |
@@ -85,7 +85,7 @@ OpenClaw out of the box ships with **permissive defaults** designed for local de
 
 SaferClaw is **not** about crippling OpenClaw. These powerful features remain fully functional:
 
-- Shell execution (security via systemd hardening, elevated mode disabled, and scoped workspace)
+- Shell execution (security via systemd hardening, elevated mode disabled, scoped workspace, and process timeouts)
 - Full coding agent capabilities (via Cursor CLI, Claude Code, or OpenCode)
 - Web search and web fetch
 - GitHub integration
@@ -373,6 +373,7 @@ This installs:
 - Bun (for build scripts)
 - Nginx + Certbot (for SSL)
 - GitHub CLI
+- AI coding CLIs: Cursor CLI, OpenAI Codex, Claude Code (for coding skills)
 - System tools (git, tmux, ffmpeg, ripgrep, jq, python3)
 - Firewall rules
 - DuckDNS auto-updater (cron every 5 min)
@@ -417,8 +418,10 @@ nano ~/.openclaw/config.json5
 
 **You MUST change these values:**
 
-1. Replace `YOUR_TELEGRAM_USER_ID` with your actual Telegram user ID (two occurrences)
-2. Replace `YOUR_DOMAIN` with your domain (e.g., `myopenclaw.duckdns.org`)
+1. Replace the `0` in `allowFrom` with your actual Telegram user ID (find it via @userinfobot)
+2. If you have a domain and SSL set up, uncomment the `webhookUrl` and `webhookPath` lines and replace `YOUR_DOMAIN`. Otherwise, leave them commented out -- the bot will use long-polling.
+
+> **Important**: The `plugins.enabled` and `plugins.entries.telegram.enabled` fields MUST be `true` for Telegram to work. They are already set correctly in the default config.
 
 ### 6.3 Install & Build
 
@@ -614,7 +617,7 @@ SaferClaw was built after a **7-phase security audit** of the OpenClaw codebase.
 
 | # | Vulnerability | Severity | SaferClaw Mitigation |
 |---|--------------|----------|---------------------|
-| 1 | **Auto-allow skills bypass** -- skills can auto-approve arbitrary binaries via `requires.bins` | CRITICAL | `autoAllowSkills` disabled; dangerous skills removed |
+| 1 | **Auto-allow skills bypass** -- skills can auto-approve arbitrary binaries via `requires.bins` | CRITICAL | Dangerous skills (`skill-creator`, `clawhub`, `mcporter`) disabled in config |
 | 2 | **Elevated mode bypass** -- `elevated=full` disables ALL security checks and approval prompts | CRITICAL | `elevated.enabled: false` -- entire feature disabled |
 | 3 | **Skill script execution** -- skills can contain unvalidated executable scripts | HIGH | Dangerous skills (`skill-creator`, `clawhub`, `mcporter`) disabled |
 | 4 | **Workspace skill override** -- workspace skills can replace bundled skills | HIGH | Workspace skill loading restricted; skill allowlist enforced |
@@ -670,8 +673,8 @@ journalctl -u openclaw -n 50
 # Verify webhook is set
 curl -s "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo" | jq .
 
-# Test OpenClaw is responding (direct, bypassing Nginx)
-curl -s http://localhost:47832/health
+# Test OpenClaw is responding (check if gateway port is open)
+ss -tlnp | grep 47832
 ```
 
 ### "Permission denied" errors

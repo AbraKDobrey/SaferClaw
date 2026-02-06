@@ -1,11 +1,13 @@
-// /home/openclaw/.openclaw/config.json5
-// OpenClaw Autonomous Bot Configuration
-// ====================================
-// 
+// ~/.openclaw/config.json5
+// OpenClaw Autonomous Bot Configuration (SaferClaw)
+// ==================================================
+//
 // INSTRUCTIONS:
 // 1. Copy this file to ~/.openclaw/config.json5
 // 2. Replace the placeholder Telegram user ID (0) with your real Telegram user ID
+//    (find yours via @userinfobot in Telegram)
 // 3. Replace YOUR_DOMAIN with your domain (e.g.: myopenclaw.duckdns.org)
+//    OR leave webhook commented out to use long-polling (works without a domain)
 // 4. Verify all tokens are set in .env.openclaw
 //
 {
@@ -13,7 +15,6 @@
   meta: {
     lastTouchedVersion: "current",
     lastTouchedAt: "2026-02-05",
-    profile: "autonomous-vps"
   },
 
   // ===== LOGGING =====
@@ -47,29 +48,28 @@
   gateway: {
     port: 47832,
     bind: "loopback",
-    
+
     auth: {
-      mode: "token"
-      // Token via env: OPENCLAW_GATEWAY_TOKEN
+      mode: "token",  // Token via env: OPENCLAW_GATEWAY_TOKEN
     },
-    
+
     controlUi: {
       enabled: false
     },
-    
+
     trustedProxies: ["127.0.0.1"],
-    
+
     http: {
       endpoints: {
         chatCompletions: { enabled: false },
         responses: { enabled: false }
       }
     },
-    
+
     nodes: {
       denyCommands: ["*"]
     },
-    
+
     tailscale: { mode: "off" },
     reload: { mode: "off" }
   },
@@ -77,43 +77,40 @@
   // ===== TOOLS - AUTONOMOUS =====
   tools: {
     profile: "full",
-    
+
     deny: [
       "gateway",
       "nodes"
     ],
-    
+
     elevated: {
       enabled: false
     },
-    
+
     exec: {
-      host: "local",
       security: "full",
       ask: "off",
-      autoAllowSkills: false,  // CRITICAL: no auto-approve of skill binaries
       timeoutSec: 600,
       backgroundMs: 30000,
       cleanupMs: 300000,
       notifyOnExit: true,
-      ptyDefault: true,
       applyPatch: {
         enabled: true
       }
     },
-    
+
     sandbox: {
       tools: {
         deny: ["gateway", "nodes"]
       }
     },
-    
+
     subagents: {
       tools: {
         deny: ["gateway", "nodes"]
       }
     },
-    
+
     message: {
       allowCrossContextSend: true,
       crossContext: {
@@ -124,11 +121,11 @@
         enabled: true
       }
     },
-    
+
     agentToAgent: {
       enabled: true
     },
-    
+
     web: {
       search: {
         enabled: true,
@@ -149,37 +146,24 @@
     defaults: {
       // Default model - via OpenRouter
       model: { primary: "openrouter/x-ai/grok-4.1-fast" },
-      
+
       sandbox: {
         mode: "off",  // No Docker - tools run directly on host
-        
+
         browser: {
           enabled: false
         }
       },
-      
+
       elevatedDefault: "off",
       timeoutSeconds: 1800,
       maxConcurrent: 3,
       contextTokens: 150000,
-      
+
       subagents: {
         maxConcurrent: 5,
         archiveAfterMinutes: 120
       },
-      
-      memory: {
-        enabled: true,
-        provider: "local",
-        sources: ["memory"],
-        sync: {
-          intervalMinutes: 5,
-          onBoot: true
-        },
-        remote: {
-          batch: { enabled: false }
-        }
-      }
     }
   },
 
@@ -188,35 +172,39 @@
     telegram: {
       enabled: true,
       // botToken via env: TELEGRAM_BOT_TOKEN
-      
+
       dmPolicy: "allowlist",
       allowFrom: [
         // REPLACE with your Telegram user ID (find via @userinfobot in Telegram)
         0
       ],
-      
+
       groupPolicy: "disabled",
       configWrites: true,
       streamMode: "partial",
-      
+
       actions: {
         reactions: true,
         sendMessage: true,
         deleteMessage: true,
         sticker: false
       },
-      
+
       reactionLevel: "ack",
       historyLimit: 100,
       dmHistoryLimit: 200,
-      textChunkLimit: 4000
-      
-      // Webhook configuration - REPLACE YOUR_DOMAIN
-      webhookUrl: "https://YOUR_DOMAIN/tg/webhook",
-      webhookPath: "/tg/webhook"
-      // webhookSecret is set via env var TELEGRAM_WEBHOOK_SECRET
+      textChunkLimit: 4000,
+
+      // ---------------------------------------------------------------
+      // WEBHOOK CONFIG (optional)
+      // Uncomment AFTER you have SSL set up via setup-ssl.sh.
+      // Without these lines, Telegram uses long-polling (works fine).
+      // ---------------------------------------------------------------
+      // webhookUrl: "https://YOUR_DOMAIN/tg/webhook",
+      // webhookPath: "/tg/webhook",
+      // webhookSecret via env: TELEGRAM_WEBHOOK_SECRET
     },
-    
+
     defaults: {
       groupPolicy: "disabled"
     }
@@ -239,12 +227,12 @@
       "healthcheck",
       "himalaya"
     ],
-    
+
     load: {
       watch: false,
       extraDirs: []
     },
-    
+
     entries: {
       "skill-creator": { enabled: false },
       "clawhub": { enabled: false },
@@ -254,8 +242,11 @@
   },
 
   // ===== HOOKS =====
+  // token is loaded from HOOKS_TOKEN env var by the gateway
+  // If you get "hooks.enabled requires hooks.token", add your token here:
+  //   hooks: { enabled: true, token: "YOUR_HOOKS_TOKEN_HERE", ... }
   hooks: {
-    enabled: true,
+    enabled: false,
     path: "/hooks",
     maxBodyBytes: 2097152
   },
@@ -263,24 +254,6 @@
   // ===== CRON =====
   cron: {
     enabled: true,
-    jobs: [
-      {
-        id: "daily-briefing",
-        name: "Daily Briefing",
-        enabled: true,
-        schedule: { cron: "0 8 * * *" },
-        sessionTarget: "main",
-        wakeMode: "now",
-        payload: {
-          kind: "agentTurn",
-          message: "Good morning! What's on the schedule for today?",
-          deliver: true,
-          channel: "telegram",
-          // REPLACE with your Telegram user ID
-          to: "0"
-        }
-      }
-    ]
   },
 
   // ===== APPROVALS - OFF =====
@@ -295,8 +268,12 @@
     enabled: false
   },
 
-  // ===== PLUGINS - OFF =====
+  // ===== PLUGINS =====
+  // IMPORTANT: Must be enabled for Telegram to work (Telegram is a plugin)
   plugins: {
-    enabled: false
+    enabled: true,
+    entries: {
+      telegram: { enabled: true }
+    }
   }
 }

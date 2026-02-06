@@ -76,16 +76,16 @@ OPENCLAW_PREFER_PNPM=1 pnpm ui:build
 echo -e "${GREEN}[5/6]${NC} Starting OpenClaw..."
 sudo systemctl start openclaw
 
-# 6. Health check
+# 6. Health check (verify gateway is listening on port 47832)
 echo -e "${GREEN}[6/6]${NC} Health check..."
 HEALTH_OK=false
 for i in {1..30}; do
     sleep 2
-    if curl -sf http://localhost:47832/health > /dev/null 2>&1; then
+    if ss -tlnp 2>/dev/null | grep -q ':47832'; then
         HEALTH_OK=true
         break
     fi
-    echo "  Waiting for health check... ($i/30)"
+    echo "  Waiting for gateway to start... ($i/30)"
 done
 
 if [ "$HEALTH_OK" = false ]; then
